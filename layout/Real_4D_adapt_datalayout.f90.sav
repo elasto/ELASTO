@@ -1,0 +1,689 @@
+!USEFORTEST toolbox
+!USEFORTEST postprocess
+!USEFORTEST io
+!USEFORTEST topo
+!> @addtogroup layout
+!! @{
+!------------------------------------------------------------------------------
+!
+! MODULE: realdatalayout
+!
+!> @author
+!> Patrick Begou, LEGI
+!
+! DESCRIPTION:
+!> The aim of this module is to provide the data structure used by codescalar.
+!> It describes the blocs organisation on each MPI process. This is a generic version
+!> wich should be processed to create a REAL version and a COMPLEX version.
+!> DO NOT CHANGE this file: it is automagicaly created from implementdatalayout.Fortran
+!> for REAL and COMPLEX data types. All changes must be done in implementdatalayout.Fortran
+!> file only.
+!------------------------------------------------------------------------------
+
+MODULE real_4D_datalayout
+
+USE precision_tools
+USE maindatalayout
+USE parser_tools
+
+IMPLICIT NONE
+
+
+! XXX Attention : on alloue que les éléments "actifs" (sur lesquels on fait des
+! calculs). Si un éléments recherché n'éxiste pas, faire l'interpolation à la
+! volée.
+
+
+    INTEGER, PRIVATE, PARAMETER ::lenName=str_medium
+    INTEGER, PRIVATE, PARAMETER :: default_size ! taille de blocs contingus mémoire : dans l'ideal (stencil_size/2)*(N**2) pour une grille de N**3 ?
+
+    TYPE REAL_PARAM
+      REAL(WP)                  :: param            !< parameter values
+      REAL(WP)                  :: scal             !< scalar value
+      INTEGER                   :: level            !< discretisation level
+      TYPE(REAL_PARAM), POINTER :: p1, p2 => null()  !< previous element of same disc. level
+      TYPE(REAL_PARAM), POINTER :: c1, c2 => null()  !< previous element of same disc. level
+    END TYPE REAL_PARAM
+
+   TYPE REAL_PARAM_PT
+     TYPE(REAL_PARAM), POINTER          :: elt               !< current element
+   END TYPE REAL_PARAM_PT
+
+! Pour le stockage contingu :
+! TYPE STOCHA_LISTE
+  !  Liste chainée bidirectionnelle de REAL_PARAM
+  ! type(REAL_PARAM), dimension(default_size) :: array
+  ! type(STOCHAL_LISTE), pointer :: previous => null()
+  ! type(STOCHAL_LISTE), pointer :: next     => null()
+! END TYPE STOCA_LIST
+! A leur création, on doit initialiser le niveau de discrétisation de tous les
+! éléments de array sur -1 pour savoir qu'ils sont libres.
+! TYPE STORAGE_STOCHA
+  ! type(STOCHA_LIST), pointer :: first => null
+  ! type(STOCHA_LIST), pointer :: last => null
+  ! integer                    :: last_indice
+! END TYPE STORAGE_STOCHA
+
+    TYPE REAL_TREE
+      INTEGER                         :: n_param    !< number of parameter values
+      INTEGER                         :: n_roots    !< number of parameter values
+      TYPE(REAL_PARAM_PT), DIMENSION(:), POINTER :: set_param  !< set of couple of scalar values and associated parameters
+! Si le stockage est fait de façon contingue
+! type(storage_Stochastic), pointer :: storage => null()
+    END TYPE REAL_TREE
+! Si storage ne pointe pas vers null :
+! + quand on ajoute un élément "fils" on alloue pas le pointeur "fils" mais on le fait pointer vers le premier élément
+!   libre du "storage" :
+!     - si last_indice< default_size, il s'agit de "storage%last(last_indice+1)"
+!     (ie fils => storage%last(last_indice+1))
+!     et on met à jour le dernier indice "last_indice = last_indice +1"
+!     - sinon : on alloue last%next, on met à jour last avec "last =>
+!     last%next", on obtient "fils => last(1)" et on met à jour "last_indice = 1"
+! + quand on supprime un élément, on mets son niveau de discrétisation sur -1
+! (on ne peut plus le désallouer directement)
+! + quand on a finit de suprimer des éléments, on réoragnise la mémoire.
+! Pour réorganiser la mémoire :
+! Etape 0 : "current" pointe vers le premier élément du storage : storage%first(1)
+! Etape 1 : On met à jour "lasti_ind" pour que last(last_ind) pointe vers le dernier élément non libre (ie
+! niveau de discrétisation /= -1). Si on remont d'un array, on libère le tableau
+! vide.
+! Etape 2 : on part de l'élément "current" et on avance "current" dans storage jusqu'au
+! premier élément libre (niveau de  discrétisation = -1). Dès qu'on en trouve un, on prend le dernier élément
+! libre et on le déplace.
+! Etape 3 : si current /= last, on retourne à l'étape 1.
+
+
+    TYPE REAL_4D_ADAPT_LAYOUT
+      CHARACTER(LEN=lenName) :: name !< The name of the datas U, V, scalar 1....etc
+      INTEGER :: nx         !< Global grid size for the datas
+      INTEGER :: ny         !< Global grid size for the datas
+      INTEGER :: nz         !< Global grid size for the datas
+      ! curlayout should be alongX or alongY or alongZ
+      INTEGER :: curlayout  !< should be alongX or alongY or alongZ
+      INTEGER :: xmin  !< start X position in the global array for the current layout
+      INTEGER :: xmax  !< final X position in the global array for the current layout
+      INTEGER :: ymin  !< start Y position in the global array for the current layout
+      INTEGER :: ymax  !< final Y position in the global array for the current layout
+      INTEGER :: zmin  !< start Z position in the global array for the current layout
+      INTEGER :: zmax  !< final Z position in the global array for the current layout
+
+      !> The datas (U, V....). The array size is (xmin:xmax,ymin:ymax,zmin:zmax)
+      TYPE(REAL_TREE), DIMENSION(:,:,:), POINTER :: field => NULL()
+      !> A ncpus x 2 array: ymin and ymax values for each cpu when the layout is along X axis
+      INTEGER, DIMENSION(:,:),POINTER :: Yrange => NULL()
+      !> A ncpus x 2 array: zmin and zmax values for each cpu when the layout is along X axis
+      INTEGER, DIMENSION(:,:),POINTER :: Zrange => NULL()
+      !> Physical dimensions
+      REAL(WP) ::Lx,Ly,Lz
+
+! Pour les points frontière, on veut un stockage mémoire contingu
+! type(storage_stochastic), dimension(9), pointer :: boundary => null()
+
+    END TYPE REAL_4D_ADAPT_LAYOUT
+
+
+!   INTERFACE ASSIGNMENT(=)
+!       MODULE PROCEDURE real4D_affectation
+!   END INTERFACE
+
+    ! this internal subroutine inherited from maindatalayout is set to PRIVATE
+    ! it should not be seen out of this module.
+    PRIVATE initLayoutArray
+
+CONTAINS
+
+!------------------------------------------------------------------------------
+!> Initialization of oriented graph to store pair of (parameter;scalar)
+!> @author
+!> Jean-Baptiste Lagaert
+!
+!> @details
+!> This subroutine allocate and organise the data associated to the adaptive
+!! mesh for the strochastic space.
+!> @param[in]     rank      = MPI rank
+!> @param[in,out] set       = the oriented graph
+!> @param[in]     n_parents = number of "roots" (ie reference mesh size), optional, default = 2
+!> @return true if memory is successfuly allocated
+!------------------------------------------------------------------------------
+FUNCTION real_4D_init_set(rank,set,n_parents)
+    IMPLICIT NONE
+    INTEGER, INTENT(IN)           :: rank
+    TYPE(REAL_TREE),INTENT(INOUT) :: set
+    INTEGER, INTENT(IN), OPTIONAL :: n_parents
+    LOGICAL                       :: real_4D_init_set
+
+    INTEGER :: ires
+
+    ! Prepare initialisation
+    real_4D_init_set = .false.
+    if (associated(set%set_param)) deallocate(set%set_param)
+
+    set%n_param = 3
+    if (present(n_parents)) set%n_param = n_parents
+    set%n_roots = set%n_param
+    allocate(set%set_param(set%n_roots),stat=ires)
+
+    if (ires .ne.0) then
+      write(6,'(a,i0,a)')"ERROR on process ",rank,": not enought memory for datas!"
+      return
+    end if
+
+    do ires = 1, set%n_param
+      set%set_param(n_parents)%elt%level = 1
+    end do
+    real_4D_init_set = .true.
+
+END FUNCTION real_4D_init_set
+
+
+!------------------------------------------------------------------------------
+!> Add a child to a non-root element
+!> @author
+!> Jean-Baptiste Lagaert
+!
+!> @details
+!> @param[in]     rank      = MPI rank
+!> @param[in]     dir       = child direction (false=left or true=right)
+!> @param[in,out] parent    = element to which a child will be add
+!> @return true if child is succesfully added
+!------------------------------------------------------------------------------
+FUNCTION real_4D_add_child(rank,parent, dir)
+    IMPLICIT NONE
+    INTEGER, INTENT(IN)             :: rank
+    LOGICAL, INTENT(IN)             :: dir
+    TYPE(REAL_PARAM), POINTER, INTENT(INOUT)  :: parent
+    LOGICAL                         :: real_4D_add_child
+
+    INTEGER, DIMENSION(2)           :: child_ind
+    TYPE(REAL_PARAM), pointer       :: p2, child, p1_c, p2_c
+    LOGICAL                         :: update           ! if parent_2 belongs to two or more discretisation level
+
+    ! == Prepare initialisation ==
+    real_4D_add_child = .false.
+
+    ! == Check if parent is not a root ! ==
+    if (parent%level==1) then
+      write(6,'(a,i0,a)')"ERROR on process ",rank,  &
+        & ": use 'real_4D_add_child_root' to add some child to a root"
+      return
+    end if
+
+    ! == Get the other parent and prepare the update of their children when needed ==
+    if (dir) then ! Add a right child to parent
+      p1_c = parent%c1
+      ! Search the other parent
+      update = .false.
+      p2 = parent%p2
+      if (p2%level == (parent%level -1)) then
+        if (associated(p2%c1)) then
+          p2 = p2%c1
+          p2_c = p2%c2
+          update = .true.
+        end if
+      end if
+    else
+      p1_c = parent%c2
+      ! Search the other parent
+      update = .false.
+      p2 = parent%p1
+      if (p2%level == (parent%level -1)) then
+        if (associated(p2%c2)) then
+          p2 = p2%c2
+          p2_c = p2%c1
+          update = .true.
+        end if
+      end if
+    end if
+
+    ! == Test if there is no already a child ==
+    !   ... for the current parent
+    if (associated(p1_c)) then
+      write(6,'(a,i0,a)')"ERROR on process ",rank,": parent has already a child"
+      return
+    end if
+    !   ... and for the other one !
+    if (update) then
+      if (associated(p2_c)) then
+        write(6,'(a,i0,a)')"ERROR on process ",rank,": parent_2 has already a child"
+        return
+      end if
+    end if
+
+    ! == Add the child ==
+    ! Allocate memory
+    allocate(p1_c)
+    child = p1_c
+    ! Init
+    child%level = parent%level + 1
+    p1_c => child
+    if (update) p2_c => child
+    if (dir) then
+      child%p1 = parent
+      child%p2 = p2
+    else
+      child%p2 => parent
+      child%p1 => p2
+    end if
+
+    ! Init child value
+    child%param = 0.5_WP*(parent%param + p2%param)
+    child%scal  = 0.5_WP*(parent%scal  + p2%scal)
+
+    ! Job done !!
+    real_4D_add_child = .true.
+
+END FUNCTION real_4D_add_child
+
+
+!------------------------------------------------------------------------------
+!> Add a child to a root element from a oriented graph
+!> @author
+!> Jean-Baptiste Lagaert
+!
+!> @details
+!> @param[in]     rank      = MPI rank
+!> @param[in]     dir       = child direction (false=left or true=right)
+!> @param[in,out] graph     = graph which will have a new element
+!> @param[in,out] graph_ind = indice of the root which will have a new child
+!> @return true if child is succesfully added
+!------------------------------------------------------------------------------
+FUNCTION real_4D_add_child_root(rank, dir, graph, graph_ind)
+    IMPLICIT NONE
+    INTEGER, INTENT(IN)             :: rank, graph_ind
+    LOGICAL                         :: dir
+    TYPE(REAL_TREE),INTENT(INOUT)   :: graph
+    LOGICAL                         :: real_4D_add_child_root
+
+    TYPE(REAL_PARAM), POINTER       :: child, p1, p2  ! shortcut to the two parents and to the new child
+    TYPE(REAL_PARAM), POINTER       :: p1_c, p2_c     ! shortcut to update parents children
+    INTEGER                         :: ind, ind2      ! child indice (as child of p1 and p2)
+
+    ! Prepare initialisation
+    real_4D_add_child_root = .false.
+
+    ! Check if dir is compatible with the graph
+    if ((graph_ind>graph%n_roots).or.(graph_ind<1).or.  &
+        &(dir .and. (graph_ind==graph%n_roots))   .or.  &
+        &(.not.(dir) .and. (graph_ind==1))            ) then
+      write(6,'(a,i0,a)')"ERROR on process ",rank,": wrong indice to add a child to a root"
+      return
+    end if
+
+    ! Test if there is no already a child
+    if (dir) then
+      p1 = graph%set_param(graph_ind)%elt
+      p2 = graph%set_param(graph_ind+1)%elt
+      p1_c = p1%c2
+      p2_c = p2%c1
+    else
+      p1 = graph%set_param(graph_ind-1)%elt
+      p2 = graph%set_param(graph_ind)%elt
+      p1_c = p1%c1
+      p2_c = p2%c2
+    end if
+    if (  associated(p1_c)   .or. &
+        & associated(p2_c)) then
+      write(6,'(a,i0,a)')"ERROR on process ",rank,": parent has already a child"
+      return
+    end if
+
+    ! == Add the child ==
+    ! Allocate memory
+    allocate(p1_c)
+    child = p1_c
+    ! Init child
+    child%level = 2
+    p2_c      =  child
+    child%p1  =  p1
+    child%p2  =  p2
+
+    ! Init child value
+    child%param = 0.5_WP*(p1%param + p2%param)
+    child%scal  = 0.5_WP*(p1%scal + p2%scal)
+
+    ! Job done !!
+    real_4D_add_child_root = .true.
+
+END FUNCTION real_4D_add_child_root
+
+
+!------------------------------------------------------------------------------
+!> Delete an element (and all its children)
+!> @author
+!> Jean-Baptiste Lagaert
+!
+!> @details
+!> @param[in]     rank  = MPI rank
+!> @param[in,out] elt   = element to delete
+!> @return true if element is succesfully deleted
+!------------------------------------------------------------------------------
+RECURSIVE FUNCTION real_4D_delete_elt(rank,elt,nb_deleted) result(res)
+    IMPLICIT NONE
+    INTEGER, INTENT(IN)                     :: rank
+    TYPE(REAL_PARAM),INTENT(INOUT), pointer :: elt
+    INTEGER, INTENT(OUT)                    :: nb_deleted
+    LOGICAL                                 :: res
+
+    INTEGER                                 :: ind, sub_del
+    TYPE(REAL_PARAM), pointer               :: temp
+
+    res = .false.
+
+    ! == Delete child ==
+    ! c1 = left child
+    if(associated(elt%c1)) then
+      if(.not.(real_4D_delete_elt(rank,elt%c1, sub_del))) then
+        write(6,'(a,i0,a)')"ERROR on process ",rank,": unable to delete child(ind)"
+        return
+      end if
+      if(associated(elt%c1)) deallocate(elt%c1)
+      nb_deleted = nb_deleted + sub_del
+    end if
+    ! c2 = right child
+    if(associated(elt%c2)) then
+      if(.not.(real_4D_delete_elt(rank,elt%c2, sub_del))) then
+        write(6,'(a,i0,a)')"ERROR on process ",rank,": unable to delete child(ind)"
+        return
+      end if
+      if(associated(elt%c2)) deallocate(elt%c2)
+      nb_deleted = nb_deleted + sub_del
+    end if
+
+    ! Delete child and update parents
+    if(elt%p1%c2%level  == elt%level -1) elt%p1%c2 => null()
+    if(elt%p2%c1%level == elt%level - 1) elt%p2%c1 => null()
+    deallocate(elt)
+    elt => null()
+    nb_deleted = nb_deleted + 1
+
+    res = .true.
+
+END FUNCTION real_4D_delete_elt
+
+
+!------------------------------------------------------------------------------
+!> Delete a graph
+!> @author
+!> Jean-Baptiste Lagaert
+!
+!> @details
+!> @param[in]     rank  = MPI rank
+!> @param[in,out] graph = graph to delete
+!> @return true if element is succesfully deleted
+!------------------------------------------------------------------------------
+FUNCTION real_4D_delete_graph(rank,graph)
+    IMPLICIT NONE
+    INTEGER, INTENT(IN)                     :: rank
+    TYPE(REAL_TREE),INTENT(INOUT)           :: graph
+    LOGICAL                                 :: real_4D_delete_graph
+
+    INTEGER                                 :: ind, sub_del
+
+    real_4D_delete_graph = .false.
+
+    ! Delete each roots
+    do ind = 1, graph%n_roots
+      if(.not.(real_4D_delete_elt(rank,graph%set_param(ind)%elt, sub_del))) then
+        write(6,'(a,i0,a)')"ERROR on process ",rank,": unable to delete child(ind)"
+        return
+      end if
+    end do
+
+    deallocate(graph%set_param)
+
+END FUNCTION real_4D_delete_graph
+
+
+!------------------------------------------------------------------------------
+!> @author
+!> Jean-Baptiste Lagaert
+!
+!> \brief
+!> Data layout (4D adaptative variant) initialisation on each process
+!
+!> @details
+!> This subroutine allocate and organise the data for the local process, taking account
+!> for the local distribution along on the the X axis.
+!
+!> @param[in] name the name of this data (U, pressure, scalar_1...). It should not contains spaces, tabs nor special characters as it can be used to create file names.
+!> @param[in,out] val is the variable of type DATA_LAYOUT to be instanciated
+!> @param[in] nx global domain discretization size along X axis
+!> @param[in] ny global domain discretization size along Y axis
+!> @param[in] nz global domain discretization size along Z axis
+!> @param[in] Lx global domain lenght along X axis
+!> @param[in] Ly global domain lenght along Y axis
+!> @param[in] Lz global domain lenght along Z axis
+!> @param[in] nbcpus the total number of available cpus
+!> @param[in] me my rank in the cpus pool. Range in  [0,nbcpus-1]
+!> @return true if memory is successfuly allocated
+!------------------------------------------------------------------------------
+LOGICAL FUNCTION real_4D_initDataLayout(name,field,n_parents,nx,ny,nz,Lx,Ly,Lz,nbcpus,me,how)
+
+    USE mpilayout_tools
+
+    IMPLICIT NONE
+    CHARACTER(LEN=*), INTENT(IN)  :: name
+    INTEGER, INTENT(IN)           :: nx,ny,nz
+    INTEGER, INTENT(IN)           :: n_parents
+    REAL(WP), INTENT(IN) :: Lx,Ly,Lz
+    TYPE(REAL_4D_ADAPT_LAYOUT),INTENT(INOUT) :: field
+    INTEGER, INTENT(IN)           :: nbcpus,me
+    INTEGER, INTENT(IN),OPTIONAL  :: how   !default to alongX
+
+    LOGICAL ::res
+    INTEGER :: ncpus1,ncpus2,ires, i
+
+    real_4D_initDataLayout=.FALSE.
+
+    !if something is allocated, deallocate it
+    IF(ASSOCIATED(field%field)) DEALLOCATE(field%field)
+    IF(ASSOCIATED(field%Yrange)) DEALLOCATE(field%Yrange)
+    IF(ASSOCIATED(field%Zrange)) DEALLOCATE(field%Zrange)
+
+    IF (LEN_TRIM(name).LT.lenName) THEN
+      field%name=name
+    ELSE
+      field%name=name(1:lenName)
+    ENDIF
+
+    field%nx=nx
+    field%ny=ny
+    field%nz=nz
+
+    ! how many cpus in the twho decomposed dimensions ?
+    CALL computeProcsMatrix(nbcpus,ncpus1,ncpus2,me,res)
+    IF (.NOT. res) return
+
+    !get the data organisation on the cpus
+    IF (.NOT. ( initLayoutArray(field%Yrange,field%Zrange,ncpus1,ncpus2,ny,nz))) THEN
+      WRITE(6,'(a,i0,a)')"ERROR on process ",me,": not enought memory!"
+      RETURN
+    ENDIF
+
+    field%xmin=1
+    field%xmax=nx
+    field%ymin=field%Yrange(me+1,1)
+    field%ymax=field%Yrange(me+1,2)
+    field%zmin=field%Zrange(me+1,1)
+    field%zmax=field%Zrange(me+1,2)
+
+    field%Lx=Lx
+    field%Ly=Ly
+    field%Lz=Lz
+
+    ALLOCATE(field%field(field%xmin:field%xmax ,field%ymin:field%ymax , field%zmin:field%zmax),stat=ires)
+    IF (ires .NE.0) THEN
+      WRITE(6,'(a,i0,a)')"ERROR on process ",me,": not enought memory for datas!"
+      RETURN
+    ELSE
+      ! Init each tree
+      res = real_4D_init_set(me, &
+          & field%field(1,field%ymin, field%zmin),n_parents)
+      do k = zmin, zmax
+        do j = ymin, ymax
+          do i = xmin, xmax
+            allocate(field%filed(i,j,k)%elt
+            field%field(i,j,k)%elt = field%field(1,field%ymin, field%zmin)%elt
+          end do
+        end do
+      end do
+    ENDIF
+    real_4D_initDataLayout=.TRUE.
+
+END FUNCTION real_4D_initDataLayout
+
+
+!------------------------------------------------------------------------------
+!> This routine should be called to free memory allocated in a DATA_LAYOUT variable.
+!> @author
+!> Patrick Begou, Jean-Baptiste Lagaert, LEGI
+!
+!> @param[in,out] val is the variable of type REAL_4D_ADAPT_LAYOUT to be freed
+!------------------------------------------------------------------------------
+SUBROUTINE real_4D_deleteDataLayout(rank,val)
+    INTEGER,INTENT(IN)                        :: rank
+    TYPE(REAL_4D_ADAPT_LAYOUT),INTENT(INOUT)  :: val
+
+    INTEGER   :: i,j,k
+
+    if(associated(val%field)) then
+      do k = val%zmin, val%zmax
+        do j = val%ymin, val%ymax
+          do i = val%xmin, val%xmax
+            if (associated(val%field(i,j,k)%set_param)) then
+              if(.not.(real_4D_delete_graph(rank, val%field(i,j,k)))) then
+                write(6,'(a,i0,a)')"ERROR on process ",rank,": graph not freed !"
+                return
+              end if
+            end if
+          end do
+        end do
+      end do
+    end if
+
+    if(associated(val%Yrange)) deallocate(val%Yrange)
+    if(associated(val%Zrange)) deallocate(val%Zrange)
+
+    val%field => NULL()
+    val%Yrange => NULL()
+    val%Zrange => NULL()
+
+    val%xmin=0
+    val%xmax=-1
+    val%ymin=0
+    val%ymax=-1
+    val%zmin=0
+    val%zmax=-1
+END SUBROUTINE real_4D_deleteDataLayout
+
+
+!------------------------------------------------------------------------------
+!> @author
+!> Patrick Begou and Jean-Baptiste Lagaert
+!
+!> \brief
+!> Check that the different REAL_4D_ADAPT_LAYOUT argument have the same layout :
+!> same global dimensions and same local dimensions.
+!> @param[in] val is the variable of type REAL_4D_ADAPT_LAYOUT for wich the layout is checked
+!> @param[in] val1 is a variable of type REAL_4D_ADAPT_LAYOUT to compare with
+!> @param[in] val2 is an optional variable of type REAL_4D_ADAPT_LAYOUT to compare with
+!> @param[in] val3 is an optional variable of type REAL_4D_ADAPT_LAYOUT to compare with
+!> @param[in] val4 is an optional variable of type REAL_4D_ADAPT_LAYOUT to compare with
+!> @param[in] val5 is an optional variable of type REAL_4D_ADAPT_LAYOUT to compare with
+!> @return .TRUE. if all the provided variable have the same layout
+!------------------------------------------------------------------------------
+RECURSIVE FUNCTION real_4D_samelayout(val,val1,val2,val3,val4,val5) result(res)
+
+    IMPLICIT NONE
+
+    TYPE(REAL_4D_ADAPT_LAYOUT),INTENT(IN) :: val, val1
+    TYPE(REAL_4D_ADAPT_LAYOUT),INTENT(IN), OPTIONAL :: val2
+    TYPE(REAL_4D_ADAPT_LAYOUT),INTENT(IN), OPTIONAL :: val3
+    TYPE(REAL_4D_ADAPT_LAYOUT),INTENT(IN), OPTIONAL :: val4
+    TYPE(REAL_4D_ADAPT_LAYOUT),INTENT(IN), OPTIONAL :: val5
+
+    LOGICAL :: res
+
+    IF (PRESENT(val5)) THEN
+      res=(real_4D_samelayout(val,val1) &
+         &.AND. &
+	 & real_4D_samelayout(val1,val2)&
+         &.AND. &
+	 & real_4D_samelayout(val2,val3)&
+         &.AND. &
+	 & real_4D_samelayout(val3,val4)&
+         &.AND. &
+	 & real_4D_samelayout(val4,val5)&
+	 &)
+    ELSEIF (PRESENT(val4)) THEN
+      res=(real_4D_samelayout(val,val1) &
+         &.AND. &
+	 & real_4D_samelayout(val1,val2)&
+         &.AND. &
+	 & real_4D_samelayout(val2,val3)&
+         &.AND. &
+	 & real_4D_samelayout(val3,val4)&
+	 &)
+    ELSEIF (PRESENT(val3)) THEN
+      res=(real_4D_samelayout(val,val1) &
+         &.AND. &
+	 & real_4D_samelayout(val1,val2)&
+         &.AND. &
+	 & real_4D_samelayout(val2,val3)&
+	 &)
+    ELSEIF (PRESENT(val2)) THEN
+      res=(real_4D_samelayout(val,val1) &
+         &.AND. &
+	 & real_4D_samelayout(val1,val2)&
+	 &)
+    ELSE
+      res= (&
+         & val%nx .EQ. val1%nx &
+	 & .AND. &
+         & val%ny .EQ. val1%ny &
+	 & .AND. &
+         & val%nz .EQ. val1%nz &
+	 & .AND. &
+         & val%xmin .EQ. val1%xmin &
+	 & .AND. &
+         & val%xmax .EQ. val1%xmax &
+	 & .AND. &
+         & val%ymin .EQ. val1%ymin &
+	 & .AND. &
+         & val%ymax .EQ. val1%ymax &
+	 & .AND. &
+         & val%zmin .EQ. val1%zmin &
+	 & .AND. &
+         & val%zmax .EQ. val1%zmax &
+	 & .AND. &
+         & val%Lx .EQ. val1%Lx &
+	 & .AND. &
+         & val%Ly .EQ. val1%Ly &
+	 & .AND. &
+         & val%Lz .EQ. val1%Lz)
+    ENDIF
+
+    RETURN
+
+END FUNCTION real_4D_samelayout
+
+
+FUNCTION real_4D_get_elt(field,root,adress, elt)
+! XXX Attention : on alloue que les éléments "actifs" (sur lesquels on fait des
+! calculs). Si un éléments recherché n'éxiste pas, faire l'interpolation à la
+! volée.
+
+    elt = field(ir)
+    do i = 1, size(adress)
+      if adress(i) then ! then left
+        elt = elt%c1
+      else
+        elt = elt%c2
+      end if
+    end do
+    
+
+
+
+END MODULE real_4D_datalayout
+!> @}
