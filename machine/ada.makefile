@@ -1,0 +1,6 @@
+FC=mpiifort
+#FFLAGS=-O3 -g -DHDF5 -DLAPACK
+FFLAGS=-O3 -g -DHDF5
+LIBS=
+CC=mpicc
+CCFLAGS=-O3 -g

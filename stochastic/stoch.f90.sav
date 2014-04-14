@@ -1,0 +1,65 @@
+MODULE stochastic
+
+    USE precision_tools
+    USE real_4D_datalayout
+
+CONTAINS
+
+
+!> @return .TRUE. if initialization is successfull.
+!------------------------------------------------------------------------------
+FUNCTION InitStoch(field,nx,ny,nz,Lx,Ly,Lz,nbcpus,me) result(res)
+
+    IMPLICIT NONE
+
+    INTEGER, INTENT(IN)           :: nx,ny,nz
+    REAL(WP), INTENT(IN)          :: Lx,Ly,Lz
+    INTEGER, INTENT(IN)           :: nbcpus,me
+
+    TYPE(REAL_4D_ADAPT_LAYOUT),INTENT(INOUT) :: field
+    INTEGER :: n_parents = 1 ! Number of roots (ie minimal set of stochastic discretization)
+
+    CHARACTER(LEN=5)              :: name
+
+    LOGICAL ::res
+
+    name = 'stoch'
+
+    res = real_4D_initDataLayout(name,field,n_parents,nx,ny,nz,Lx,Ly,Lz,nbcpus,me)
+
+
+END FUNCTION InitStoch
+
+
+!>Time Advancement using Euler explicit and upwind scheme 
+!------------------------------------------------------------------------------
+FUNCTION RealTimeAdvancementi_EE_US()
+
+        interger, param :: left = .true.
+
+        do k = field%zmin, field%zmax
+          do j = field%ymin, field%ymax
+            do i = field%xmin, field%xmax
+
+               do ir = 1, field%n_roots
+                  ! update racine
+                  call update_root(field,ir,dt,dx,i,j,k)
+
+                  ! update 1st level left child with recursive update for the
+                  ! other child level
+                  if (associated(field%field(i,j,k)%set_param(ir)%elt%c1) then
+                     ! address of c1 = ir, (/left/)
+                     call update_recursive_child(ir,(/left/), field, dt, dx, i, j, k)
+                  end if
+
+               end do
+              
+            end do
+          end do
+        end do
+
+END FUNCTION RealTimeAdvancementi_EE_US
+
+END MODULE stochastic
+
+

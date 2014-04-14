@@ -1,0 +1,257 @@
+!---------------------------------------------------------------------------------
+MODULE plasticflow
+
+  USE precision_tools
+  USE datalayout
+  USE wavenumber_tools
+
+  IMPLICIT NONE
+
+  PUBLIC  :: initplasticflow
+  !PUBLIC  :: probabilityL,probabilityE
+  
+  !=== INTERFACE ===
+!  INTERFACE initplasticflow
+!    FUNCTION probabilityL(sigma,Lsigma,T,delta_t) result(success)
+!      TYPE(REAL_DATA_LAYOUT), INTENT(IN)     :: sigma
+!      REAL(WP),DIMENSION(:,:,:), ALLOCATABLE :: Lsigma
+!      REAL(WP),               INTENT(IN)     :: delta_t,T
+!      LOGICAL                                :: success
+!    END FUNCTION probabilityL
+ !   
+ !   FUNCTION probabilityE(sigma,Esigma,T,delta_t) result(success)
+ !     TYPE(REAL_DATA_LAYOUT), INTENT(IN)     :: sigma
+ !     REAL(WP),DIMENSION(:,:,:), ALLOCATABLE :: Esigma
+ !     REAL(WP),               INTENT(IN)     :: delta_t,T
+ !     LOGICAL                                :: success
+ !   END FUNCTION probabilityE
+!  END INTERFACE initplasticflow
+
+
+CONTAINS
+
+!---------------------------------------------------------------------------------
+!> Initialization fields
+!! @autor
+!! Luca MARRADI, LIPhy 2014
+!
+!> @param[in,out]   sigma               = longitudinal velocity storage to initialize
+!> @param[in]       sigmaWN           = the wavenumbers for U,V and W
+!> @param[in]       nbcpus          = the total amount of processes (or cpus)
+!> @param[in]       spec_rank       = my MPI processe rank in the range [0:nbcpus-1]
+!> @return          ok              = LOGICAL set to .TRUE. if all initialization success.
+!---------------------------------------------------------------------------------
+  FUNCTION initplasticflow(convol,n_activ,sigmak,G,sigma,sigma_old,Esigma,Lsigma,gammadot_min,sigmaWN,nbcpus,spec_rank) result(ok)
+ 
+    USE datalayout
+    USE parser_tools
+    !USE avs
+    !USE transforms_tools
+    !USE mpi
+
+    IMPLICIT NONE
+
+    !== INPUT/OUTPUT DATA ==
+    TYPE(REAL_DATA_LAYOUT), INTENT(INOUT)     :: sigma,sigma_old
+    TYPE(REAL_DATA_LAYOUT), INTENT(INOUT)     :: Esigma,Lsigma,n_activ,convol
+    TYPE(COMPLEX_DATA_LAYOUT), INTENT(INOUT)  :: G,sigmak
+    TYPE(WaveNumbers),      INTENT(IN)        :: sigmaWN
+    REAL(WP),               INTENT(IN)        :: gammadot_min
+    INTEGER,                INTENT(IN)        :: nbcpus,spec_rank
+    LOGICAL                                   :: ok
+
+    !== LOCAL DATA ==
+    TYPE(WaveNumbers)                         :: kWN
+    REAL(WP)        :: zz
+    REAL(WP)        :: yy
+    REAL(WP)        :: xx
+    INTEGER         :: i,j,k,ierr
+    LOGICAL         :: res 
+
+    REAL(WP):: Lx, Ly, Lz
+!    REAL(WP):: dx
+!    REAL(WP):: kx, ky, kz
+    REAL(WP):: q4,q2
+!    REAL(WP):: twopi,pi,delt
+
+
+    ok = .false.
+  IF (.NOT. GetLxLyLz("Length of domain",Lx,Ly,Lz)) THEN
+    STOP 'FAILED in TailorGreen_init'
+  ENDIF
+
+!  twopi=2.0_WP*acos(-1.0)
+!  pi=acos(-1.0)
+
+!!!  kx = twopi/Lx
+!!!  xx = Lx/real(sigma%nx,WP)
+   
+    !=== INITIALIZATION OF WAVENUMBERS ===
+    IF(.NOT.wavesNumber_init(kWN,spec_rank,sigma%Lx,sigma%Ly,sigma%Lz,sigma%nx,sigma%ny,sigma%nz)) THEN
+      WRITE(6,'(a,i0,a)')'[ERROR] init solver on process ',spec_rank,': wave-number for velocity field not initialize'
+      RETURN
+    ENDIF
+
+    ! === INIZIALIZATION OF SIGMA ===
+    DO k = sigma%zmin,sigma%zmax
+       DO j = sigma%ymin,sigma%ymax
+          DO i = sigma%xmin,sigma%xmax
+             sigma%values(i,j,k) = 0_WP
+          ENDDO
+       ENDDO
+    ENDDO 
+
+   ! === INIZIALIZATION OF ACTIVITY ===
+    DO k = n_activ%zmin,n_activ%zmax
+       DO j = n_activ%ymin,n_activ%ymax
+          DO i = n_activ%xmin,n_activ%xmax
+             n_activ%values(i,j,k) = 0_WP
+             convol%values(i,j,k)  = 0_WP
+          ENDDO
+       ENDDO
+    ENDDO 
+
+   ! === INIZIALIZATION OF LSIGMA AND SIGMAOLD ===
+    DO k = sigma_old%zmin,sigma_old%zmax
+       DO j = sigma_old%ymin,sigma_old%ymax
+          DO i = sigma_old%xmin,sigma_old%xmax
+             sigma_old%values(i,j,k) = 0_WP
+             Lsigma%values(i,j,k) = 0_WP
+             Esigma%values(i,j,k) = 0_WP
+          ENDDO
+       ENDDO
+    ENDDO
+
+   !=== INITIALIZATION OF G PROPAGATOR ===   
+   DO k=G%zmin,G%zmax
+    DO j=G%ymin,G%ymax
+     DO i=G%xmin,G%xmax
+        q2 = ( kWN%ky(j)**2_WP + kWN%kx(i)**2_WP + kWN%kz(k)**2_WP )
+        q4 = q2*q2
+        IF ( q4.EQ.0_WP ) THEN
+         G%values(i,j,k) = -1_WP 
+        ELSE
+         q4=1_WP/q4
+         G%values(i,j,k) = -( 4_WP * kWN%kx(i)**2_WP * kWN%ky(j)**2_WP + q2*kWN%kz(k)**2_WP )  * q4
+        ENDIF
+     ENDDO
+    ENDDO
+   ENDDO
+
+   !=== INITIALIZATION OF SIGMAK ===   
+   DO k=sigmak%zmin,sigmak%zmax
+    DO j=sigmak%ymin,sigmak%ymax
+     DO i=sigmak%xmin,sigmak%xmax
+        sigmak%values(i,j,k) = 0_WP
+     ENDDO
+    ENDDO
+   ENDDO
+
+   !=== FFT ===
+   !CALL btran(G,sigma,ok)
+
+   !=== TEST PRINT OUT PROPAGATOR ===
+   !IF(.NOT.real_WriteToFile(spec_rank,trim(sigma%name),sigma))  THEN
+   !  WRITE(*,*) "does not work!!!"
+   !ENDIF
+
+    ok = .TRUE.
+  END FUNCTION initplasticflow
+
+!---------------------------------------------------------------------------------
+!> Elastic to plastic probability function (STOCHASTIC part of the code)
+!! @autor
+!! Luca MARRADI, LIPhy 2014
+!
+!> @param[in,out]   sigma           = longitudinal velocity storage to initialize
+!> @param[in]       nbcpus          = the total amount of processes (or cpus)
+!> @param[in]       spec_rank       = my MPI processe rank in the range [0:nbcpus-1]
+!> @return          ok              = LOGICAL set to .TRUE. if all
+!initialization success.
+!---------------------------------------------------------------------------------
+  FUNCTION probabilityL(sigma,Lsigma,T,delta_t,spec_rank) RESULT(success)
+
+    IMPLICIT NONE
+
+    !== INPUT/OUTPUT ==  
+    TYPE(REAL_DATA_LAYOUT), INTENT(INOUT)     :: sigma 
+    TYPE(REAL_DATA_LAYOUT), INTENT(INOUT)  :: Lsigma 
+!!   REAL(WP),DIMENSION(:,:,:), ALLOCATABLE, INTENT(INOUT) :: Lsigma
+    INTEGER,                INTENT(IN)     :: spec_rank     
+    REAL(WP),               INTENT(IN)     :: delta_t,T     
+
+    !== LOCAL DATA ==
+    LOGICAL                                :: success
+    REAL(WP)                               :: inv,maxi
+    INTEGER                                :: i,j,k
+
+    !== ALLOCATE MEMORY ==
+!!    ALLOCATE(Lsigma(sigma%xmin:sigma%xmax,sigma%ymin:sigma%ymax,sigma%zmin:sigma%zmax))
+
+    success = .FALSE.
+    inv = 1_WP/T
+
+    DO k=sigma%zmin,sigma%zmax
+     DO j=sigma%ymin,sigma%ymax
+      DO i=sigma%xmin,sigma%xmax
+        Lsigma%values(i,j,k) = delta_t !* exp( inv *( sigma%values(i,j,k)**2_WP - 1_WP ) ) 
+      ENDDO
+     ENDDO
+    ENDDO
+   
+!!  DEALLOCATE MEMORY
+!!    DEALLOCATE(Lsigma) 
+
+    success = .TRUE.
+  END FUNCTION  probabilityL
+!---------------------------------------------------------------------------------
+
+
+!---------------------------------------------------------------------------------
+!>Plastic to elastic probability function (STOCHASTIC part of the code)
+!! @autor
+!! Luca MARRADI, LIPhy 2014
+!
+!> @param[in,out]   sigma           = longitudinal velocity storage to initialize
+!> @param[in]       nbcpus          = the total amount of processes (or cpus)
+!> @param[in]       spec_rank       = my MPI processe rank in the range [0:nbcpus-1]
+!> @return          ok              = LOGICAL set to .TRUE. if all
+!initialization success.
+!---------------------------------------------------------------------------------
+  FUNCTION probabilityE(sigma,Esigma,T,delta_t,spec_rank) RESULT(success)
+
+    IMPLICIT NONE
+
+    !== INPUT/OUTPUT DATA ==   
+    TYPE(REAL_DATA_LAYOUT), INTENT(INOUT)                 :: sigma 
+    TYPE(REAL_DATA_LAYOUT), INTENT(INOUT)                 :: Esigma 
+!!    REAL(WP),DIMENSION(:,:,:), ALLOCATABLE, INTENT(INOUT) :: Esigma
+    INTEGER,                INTENT(IN)                    :: spec_rank
+    REAL(WP),               INTENT(IN)                    :: delta_t,T     
+    LOGICAL                                :: success
+
+    !== LOCAL DATA ==
+    REAL(WP)                               :: inv
+    INTEGER                                :: i,j,k
+  
+    !== ALLOCATE MEMORY ==
+!!    ALLOCATE(Esigma(sigma%xmin:sigma%xmax,sigma%ymin:sigma%ymax,sigma%zmin:sigma%zmax))
+
+    success = .FALSE.
+    inv = 1_WP/T
+
+    DO k=sigma%zmin,sigma%zmax
+     DO j=sigma%ymin,sigma%ymax
+      DO i=sigma%xmin,sigma%xmax
+        Esigma%values(i,j,k) = delta_t !* exp( inv *( -sigma%values(i,j,k)**2_WP ) ) 
+      ENDDO
+     ENDDO
+    ENDDO
+  
+!!  DEALLOCATE MEMORY
+!!    DEALLOCATE(Esigma) 
+
+    success = .TRUE.
+  END FUNCTION  probabilityE
+!---------------------------------------------------------------------------------
+END MODULE plasticflow

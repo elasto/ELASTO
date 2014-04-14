@@ -1,0 +1,130 @@
+[INFO] Cpus distribution is [  2] x [  2]
+=======================================================================================================================
+|                        Length of domain :                                                                   6.283185|
+|                         Simulation name :                                                                plasticflow|
+|                        Default topology :                                                                          0|
+|                   Simulation iterations :                                                                        100|
+|                         Fixed time step :                                                                       -1.0|
+|                       Maximum time step :                                                                  1000000.0|
+|             Convective time step number :                                                                      0.500|
+|                Viscous time step number :                                                                        1.0|
+|                      Integration Method :                                                                          0|
+|                               Viscosity :                                                                  0.0003125|
+|                          Forcing Method :                                                                   alvelius|
+|                            Power factor :                                                                       1.00|
+|                        Number of points :                                                                         64|
+|                       Dealiasing method :                                                                       none|
+|                  LES model for velocity :                                                                          0|
+|          Type of averaging for velocity :                                                                          0|
+|               Nullify first wave number :                                                                         no|
+|             Get pdf of sgs term for qdm :                                                                    .false.|
+|                            Forcing area :                                                                        1.0|
+|                         Additional mode :                                                                          0|
+|                     Forcing scalar_spec :                                                                          0|
+|    Number of scalar for particle solver :                                                                          0|
+|         Constant for particle time step :                                                                        0.5|
+|                              group_size :                                                                          5|
+|                     Forcing scalar_part :                                                                          0|
+|                        advection method :                                                                       p_M6|
+|                      advection interpol :                                                                       none|
+|                  Magnetic Prandl number :                                                                        0.0|
+|                               X-gravity :                                                                        0.0|
+|                               Y-gravity :                                                                        0.0|
+|                               Z-gravity :                                                                        0.0|
+|                  Post-process frequency :                                                                          0|
+|                         Show divergence :                                                                         10|
+|                             Show memory :                                                                          0|
+|                         Show basic info :                                                                         10|
+|               Show Magnetic growth rate :                                                                    .false.|
+|                    Scalar - basic stats :                                                                          0|
+|                      Compute scalar PDF :                                                                          0|
+|                  Compute spectrum - ite :                                                                          1|
+|                 Compute spectrum - time :                                                                        0.1|
+|                          Type of output :                                                                        avs|
+|                             slice or 3D :                                                                         3D|
+|             Post-process out simulation :                                                                         no|
+|                          Save frequency :                                                                         20|
+|                     Write output - time :                                                                          0|
+|                    Plane jet AVG - time :                                                                          0|
+|                     Plane jet AVG - ite :                                                                          0|
+|                         diff diff - ite :                                                                         -1|
+|                        diff diff - time :                                                                       -1.0|
+|                         diff diff scal1 :                                                                          2|
+|                         diff diff scal2 :                                                                          1|
+|                        mixing threshold :                                                                       0.05|
+|                              Post Kolmo :                                                                          0|
+|                                   Bxext :                                                                      0E+00|
+|                                   Byext :                                                                      0E+00|
+|                                   Bzext :                                                                      0E+00|
+|   Number of points for rediscretization :                                                                          0|
+|                   a priori test in simu :                                                                          0|
+|       filter size min for a priori test :                                                                          2|
+|       filter size max for a priori test :                                                                          8|
+|        type of filter for a priori test :                                                                     Cutoff|
+|                      Size of filter min :                                                                          8|
+|                      Size of filter max :                                                                          8|
+|                          Size of filter :                                                                          8|
+|                        MHD post process :                                                                          0|
+|                         HD post process :                                                                          0|
+|                   Scalar - moment stats :                                                                          0|
+|                             anisotropic :                                                                         no|
+|      a priori test in simu for velocity :                                                                          0|
+|                               No Energy :                                                                         no|
+|                     disc initialisation :                                                                          0|
+|                Lorentz time step number :                                                                      500.0|
+|                                R Lambda :                                                                         20|
+|                              Helicoidal :                                                                        yes|
+|                                Kmax eta :                                                                        1.5|
+|                            Peak forcing :                                                                        5.0|
+|                       Forcing amplitude :                                                                        0.1|
+|           Number of points for scalar 1 :                                                                         64|
+|          Dealiasing method for scalar 1 :                                                                   isotrope|
+|             Schmidt number for scalar 1 :                                                                        0.1|
+|                  LES model for scalar 1 :                                                                          0|
+|            Number of points for B-Field :                                                                         64|
+|                  Magnetic spectrum peak :                                                                         10|
+|                              Coef Ek/Em :                                                                       5000|
+|                         Write frequency :                                                                        100|
+|                           output format :                                                                       hdf5|
+|                          output slice2D :                                                                     .true.|
+|                            input format :                                                                       hdf5|
+|                             Show scalar :                                                                          0|
+|                     Compute Q criterium :                                                                     .true.|
+|                         MHD filter size :                                                                          4|
+|                           nb z position :                                                                          4|
+|                            z position 1 :                                                                        0.0|
+|                            z position 2 :                                                                       0.25|
+|                            z position 3 :                                                                        0.5|
+|                            z position 4 :                                                                       0.75|
+|                Range for filtering velo :                                                                     2 16 2|
+|Type of filter for velocity a priori tes :                                                                     cutoff|
+|                 number of a priori test :                                                                          0|
+|                 name of a priori test 1 :                                                                smagorinsky|
+|                 name of a priori test 2 :                                                                     scalar|
+|                                 H/theta :                                                                         30|
+|                            Jet velocity :                                                                        1.0|
+|                        Co-flow velocity :                                                                        0.0|
+|                             noise level :                                                                       0.12|
+|                                   ks/ko :                                                                        2.0|
+|                  Imposing mean gradient :                                                                          0|
+|                           TG dimensions :                                                                          1|
+|                           Spectrum form :                                                                         PP|
+|                  Number of pool of file :                                                                          2|
+|                         Post-processing :                                                             rewrite_output|
+|                        advanced_gp_size :                                                                    .false.|
+|                    1 residence time for :                                                                         -1|
+|               Forcing for scalar_spec 1 :                                                                          0|
+|Amplitude of spectral forcing for scalar :                                                                          0|
+|kmin of spectral forcing for scalar_spec :                                                                          0|
+|kmax of spectral forcing for scalar_spec :                                                                          0|
+|               Filter for velocity model :                                                                          0|
+|               Filter for scalar model 1 :                                                                     Cutoff|
+|          Model coefficient for scalar 1 :                                                                 0.08333334|
+|          Type of averaging for Scalar 1 :                                                                          0|
+=======================================================================================================================
+
+      ========== Topology used =========
+      No mpi topology
+      nb of proc along X, Y, Z = 0 0 0
+      ==================================
+
