@@ -101,7 +101,7 @@ fann_run.o : fann_run.c
 	$(CC) -c $(CFLAGS) fann_run.c
 
 clean:
-	@rm -rf *.o *.mod core ../../doc/doxygen/codescalar_doc
+	@rm -rf *.o *.mod core ../../doc/doxygen/codescalar_doc *.exe
 doc:
 	@cd ../../doc/doxygen && doxygen Doxyfile && echo "Doc start in `pwd`codescalar_doc/html/index.html"
 fortran_file:
