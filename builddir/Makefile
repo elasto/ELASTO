@@ -11,7 +11,7 @@ wrapper: compil_verbose
 
 compil_verbose: elasto.exe
 	@echo -e "\033[1;31m===== Compilation successfull =====\033[0m"
-	@cd ../.. ;ln -fs src/builddir/elasto_test.exe elasto_test.exe ; cd ./src/builddir/.
+	@cd ../.. ;ln -fs builddir/elasto.exe ../elasto.exe ; cd ELASTO/
 	@echo -e "\033[1;30mProgram is in `(cd ../..;pwd)`/scaleExe\033[0m"
 FOBJ=avg_expectation_tools.o avs_datalayout.o cart_mesh_tools.o cart_topology.o data.o datalayout.o dealias_tools.o energy_transfers.o energy_transfers_lib.o EqDM_lorentz_models.o fileio.o filtering_tools.o forcing.o forcing_scalar.o geometric_shape_tools.o interface_layout_mesh.o plasticflow.o maindatalayout.o main.o mpilayout_tools.o parallel_tools.o param.o parser_tools.o physical_values_tools.o post_HD_ener_lib.o post_hd.o post_HD_kinHel_lib.o post_hd_out.o post_in_simu.o post_kolmo.o post_lib2D.o post_lib.o post_MHD_ener_lib.o post_mhd.o post_MHD_helic_lib.o post_mhd_out.o post_specific_to_setup.o post_visus.o precision_tools.o random_tools.o rediscretization_tools.o solver.o sort_find_tools.o stat_tools.o structure_tools.o surcharge_vtkxml.o system_tools.o transforms_tools.o vel_models.o vtkxml_bin.o vtkxml.o wavenumber_tools.o avs_complex.o avs_real.o communicators_tools.o complexdatalayout.o complexparallel_tools.o complexVector_datalayout.o complexVector_parallel_tools.o differential_tools.o hdf5.o hdf5_wrapper_cartmesh.o hdf5_wrapper_datalayout.o interface_fann.o interface_io.o interpolation_velo.o mhd_model.o options.o post_out_simu.o post_scalar.o post_velocity.o realdatalayout.o realparallel_tools.o realVector_datalayout.o realVector_parallel_tools.o sca_models.o sgs_model_tools.o toolbox.o xdmf.o fann_run.o
 
@@ -101,7 +101,7 @@ fann_run.o : fann_run.c
 	$(CC) -c $(CFLAGS) fann_run.c
 
 clean:
-	@rm -rf *.o *.mod core ../../doc/doxygen/codescalar_doc *.exe
+	@rm -rf *.o *.mod core ../../doc/doxygen/codescalar_doc *.exe ../*.exe
 doc:
 	@cd ../../doc/doxygen && doxygen Doxyfile && echo "Doc start in `pwd`codescalar_doc/html/index.html"
 fortran_file:
