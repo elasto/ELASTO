@@ -1034,7 +1034,7 @@ FUNCTION post_simu_luca(ite,time,step_time,nbcpus,spec_rank,mult,sigma,sigma_old
       file_id = 410
       open(unit=file_id, file='sigma_corrXY.dat',form="FORMATTED",ACCESS='APPEND')
        write(file_id,'(g15.8)') corrXY
-      close(401)
+      close(file_id)
      endif
    ENDIF
 
@@ -1049,7 +1049,7 @@ FUNCTION post_simu_luca(ite,time,step_time,nbcpus,spec_rank,mult,sigma,sigma_old
       open(unit=501, file='activity.dat',form="FORMATTED",ACCESS='APPEND')
        write(file_id,'(g15.8)') avgXY
        !write(501,'(g15.8)') avg_act
-      close(400)
+      close(file_id)
      endif
   ENDIF
 
