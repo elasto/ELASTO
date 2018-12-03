@@ -1,4 +1,4 @@
-include ../machine/froggy-ciment.makefile
+include ../machine/pluton.makefile
 .SUFFIXES:
 .SUFFIXES: .f90 .o
 .f90.o:
