@@ -9,7 +9,7 @@ include ../machine/pluton.makefile
 
 wrapper: compil_verbose
 
-compil_verbose: elasto_test.exe
+compil_verbose: elasto.exe
 	@echo -e "\033[1;31m===== Compilation successfull =====\033[0m"
 	@cd ../.. ;ln -fs src/builddir/elasto_test.exe elasto_test.exe ; cd ./src/builddir/.
 	@echo -e "\033[1;30mProgram is in `(cd ../..;pwd)`/scaleExe\033[0m"
