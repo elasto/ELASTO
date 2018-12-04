@@ -39,7 +39,7 @@ subroutine show_memory(spec_rank)
 
     if (spec_rank ==0) then
         write(*,'(a)') '   [MEM] Memory used (% and absolute value), and cpu and user'
-        call system('ps ww -A -o %mem,vsz,user,command | grep scaleExe | grep -v grep | head -2 ')
+        call system('ps ww -A -o %mem,vsz,user,command | grep elasto.exe | grep -v grep | head -2 ')
         ! For vargas and babel, activate the following line
         !call system('ps -AkF " %z : < %u > %a" | grep scaleExe | grep -v grep | head -1 ')
     end if
