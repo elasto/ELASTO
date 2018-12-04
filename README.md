@@ -74,7 +74,7 @@ The last compiler action is necessary to most of the profiler to create one-to-o
 the source code and the hotfunction code part.
  
 
-# Maqao
+### Maqao
 Download the compiled version for your machine arch from: (http://www.maqao.org/)
 The *Documentation* section explain the different kind of profiling that maqao 
 offers.
