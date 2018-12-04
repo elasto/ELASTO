@@ -80,12 +80,12 @@ The *Documentation* section explain the different kind of profiling that maqao
 offers.
 
 Below an example taken from the mo cluster:
-(1) collect the data running the maqao profiler
+1. collect the data running the maqao profiler
 ```
 $MAQAO lprof --mpi-command="mpirun -np 4 -hosts mo78" -- $BIN -i ../input
 ```
 
-(2) generate the html view of the hotspots and loops:
+2. generate the html view of the hotspots and loops:
 ```
 $MAQAO lprof xp=$PWD/<maqao_profiler_folder> of=html
 ```
