@@ -209,7 +209,7 @@ PROGRAM main
         STOP 'Solver Error'
       ENDIF
 
-      !CALL cpu_time(time2)
+      CALL cpu_time(time2)
       IF(spec_rank.EQ.0) WRITE(6,'(a,x,i0,x,a,f8.4,a, f12.4)') &
         &'[PROGRESSION] Iteration', ite, 'requires ',time2-time1,' s, and t = ', current_time
       
