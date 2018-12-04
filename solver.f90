@@ -543,6 +543,7 @@ END FUNCTION initSolver_luca
    !ENDIF
 
    !== CHECK FOR ELASTICITY PLASTICITY EVENTS ==
+   ! TODO: This LOOP must be vectorized
 DO k=sigma%zmin,sigma%zmax
   DO j=sigma%ymin,sigma%ymax
    DO i=sigma%xmin,sigma%xmax
