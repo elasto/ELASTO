@@ -1,10 +1,10 @@
 # Debug symbols
-GPROF=-pg
+GPROF=-g#-pg
 
 #INTEL
 FC=mpiifort
 CC=mpiicc
-COMPILO=-O3 -xAVX2 
+COMPILO=-O0 -xAVX#2 
 
 # HDF5
 HDF5=-I${DIR}/include -DHDF5 
